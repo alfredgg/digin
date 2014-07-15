@@ -10,7 +10,7 @@ MODE_FRONT2REVER = 0
 MODE_REVER2FRONT = 1
 MODE_ALTERNATE = 2
 
-app = Flask(__name__)
+app = Flask(__name__, static_path='')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///digin.db'
 db = SQLAlchemy(app)
@@ -34,9 +34,19 @@ class Card(db.Model):
     rever = db.Column(db.Text)
 
 
-#TODO: Add user
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String, unique=True, nullable=False)
+    password = db.Column(db.String, nullable=False)
+
+
+class Settings(db.Model):
+    questions_by_game = db.Column(db.Integer, default=10)
+
+
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     card_id = db.Column(db.Integer, db.ForeignKey('card.id'))
     mode = db.Column(db.Integer)
     error_rate = db.Column(db.Float, default=-1)
@@ -45,6 +55,7 @@ class Question(db.Model):
 
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     deck_id = db.Column(db.Integer, db.ForeignKey('deck.id'))
     opened = db.Column(db.Boolean, default=False)
     date = db.Column(db.DateTime, default=datetime.now())
@@ -54,9 +65,14 @@ db.create_all()
 api_manager = APIManager(app, flask_sqlalchemy_db=db)
 api_manager.create_api(Card, methods=['GET', 'POST', 'DELETE', 'PUT'])
 
+@app.route("/new_game")
+def create_game():
+    pass
+
 
 @app.route("/")
 def hello():
+    return app.send_static_file("index.html")
     return "Hello World!"
 
 if __name__ == "__main__":
