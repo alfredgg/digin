@@ -65,19 +65,16 @@ def obtain_probabilities(questions):
 
 def rulette_of_fortune(elems, nchoices):
     selected = []
-    for _ in xrange(nchoices):
-        search = True
-        while search:
-            val = random()
-            current = 0
-            for e in elems:
-                if current >= val:
-                    if e[0] not in selected:
-                        selected.append(e[0])
-                        search = False
-                    break
-                else:
-                    current = current + e[1]
+    while len(selected) < nchoices:
+        val = random()
+        current = 0
+        for e in elems:
+            if current >= val:
+                if e[0] not in selected:
+                    selected.append(e[0])
+                break
+            else:
+                current = current + e[1]
     return selected
 
 
