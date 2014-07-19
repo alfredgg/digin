@@ -4,7 +4,7 @@
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.restless import APIManager
-from datetime import datetime
+import game_creator
 
 MODE_FRONT2REVER = 0
 MODE_REVER2FRONT = 1
@@ -24,14 +24,19 @@ game = db.Table(
 
 class Deck(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.Text)
+    name = db.Column(db.Text, nullable=False)
+    date = db.Column(db.DateTime, default=datetime.now())
+    cards = db.relationship('Card', backref='deck', lazy='dynamic')
 
 
 class Card(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    id_deck = db.Column(db.Integer, db.ForeignKey('deck.id'))
+    id_deck = db.Column(db.Integer,
+                        db.ForeignKey('deck.id'),
+                        nullable=False)
     front = db.Column(db.Text)
     rever = db.Column(db.Text)
+    questions = db.relationship('Question', backref='card', lazy='dynamic')
 
 
 class User(db.Model):
@@ -41,6 +46,7 @@ class User(db.Model):
 
 
 class Settings(db.Model):
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), primary_key=True)
     questions_by_game = db.Column(db.Integer, default=10)
 
 
@@ -51,13 +57,14 @@ class Question(db.Model):
     mode = db.Column(db.Integer)
     error_rate = db.Column(db.Float, default=-1)
     times = db.Column(db.Integer, default=0)
+    last_time = db.Column(db.DateTime)
 
 
 class Game(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     deck_id = db.Column(db.Integer, db.ForeignKey('deck.id'))
-    opened = db.Column(db.Boolean, default=False)
+    opened = db.Column(db.Boolean, default=True)
     date = db.Column(db.DateTime, default=datetime.now())
 
 db.create_all()
@@ -65,9 +72,22 @@ db.create_all()
 api_manager = APIManager(app, flask_sqlalchemy_db=db)
 api_manager.create_api(Card, methods=['GET', 'POST', 'DELETE', 'PUT'])
 
+
+def mount_game(questions):
+    game_creator.extract_game(questions)
+
+
 @app.route("/new_game")
-def create_game():
-    pass
+def create_game(deck_id, mode):
+    cards = Deck.query.get(deck_id).cards
+    questions = []
+    for card in cards:
+        question = card.questions.query(mode=mode)
+        if question is None:
+            question = Question(card=card)
+            db.session.add(question)
+        questions.append(question)
+    db.session.commit()
 
 
 @app.route("/")
