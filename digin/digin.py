@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from termcolor import cprint
-from app import create_game, Deck, Card, db
+from app import create_game, Deck, Card, db, MODE_FRONT2REVER
 from manager import import_file
 from tabulate import tabulate
 from os import listdir, path as ospath
@@ -12,8 +12,9 @@ pred = lambda *x: cprint(' '.join(x), 'red')
 pgreen = lambda *x: cprint(' '.join(x), 'green')
 
 
-def create_game():
-    create_game()
+def create_digin_game():
+    deck = choose_existent_deck()
+    create_game(deck.id, MODE_FRONT2REVER)
 
 
 def list_games():
@@ -76,6 +77,7 @@ def create_deck(name):
     db.session.commit()
     return deck
 
+
 def choose_deck():
     pblue('Do you want to append data to an existent deck? ')
     val = get_console_ynvalue('n')
@@ -126,7 +128,7 @@ def menu():
     value = get_console_value()
     options = {
         '0': exit,
-        '1': create_game,
+        '1': create_digin_game,
         '2': list_games,
         '3': play,
         '4': import_data_file,

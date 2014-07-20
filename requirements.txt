@@ -3,3 +3,4 @@ flask-restless
 flask-sqlalchemy
 termcolor
 tabulate
+pyhamcrest

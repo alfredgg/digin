@@ -17,68 +17,71 @@ def get_key2sort(q):
     return q[1]
 
 
-def extract_probabilities(the_dict, direct=False):
+# TODO: a cache of this function can be easily developed using a decorator
+def log_values_for(nelements):
+    # we apply margins, this way probabilities are not extreme (really bigger or really smaller values)
+    l_margin, r_margin = (nelements*L_RANGE), (nelements*R_RANGE)
+    probabilities = [-math.log((x+l_margin)/float(nelements+r_margin)) for x in xrange(nelements)]
+    # normalize the probabilities
+    return [x/sum(probabilities) for x in probabilities]
+
+
+def probability_by_position(the_list, direct=False):
     '''
-    :param the_list:
-    :param direct: True = less value gets less probability. False = less value gets more probability.
+    :param the_list: list of (id, value) pairs
+    :param direct: True = bigger value gets more probability. False = smaller value gets more probability.
     :return:
     '''
-    non_repeated = set(the_dict.values())
-    sorted_values = sorted(non_repeated) if direct else sorted(non_repeated)[::-1]
-
-    nelems = len(sorted_values)
-    # logarithm with margin to not assign 1 or 0
-    l_margin, r_margin = (nelems*L_RANGE), (nelems*R_RANGE)
-    probabilities = [-math.log((x+l_margin)/float(nelems+r_margin)) for x in xrange(nelems)]
-    # normalize the logatithm
-    probabilities = [x/sum(probabilities) for x in probabilities]
-    prob_by_value = {sorted_values[index]: prob for index, prob in enumerate(probabilities)}
-
+    # first elements in the list obtain bigger probabilities
+    elements = sorted(the_list, key=get_key2sort)[::-1] if direct else sorted(the_list, key=get_key2sort)
+    probabilities = log_values_for(len(elements))
     # assign each probability to each id
-    return {k: prob_by_value[the_dict[k]] for k in the_dict.keys()}
+    return {k[0]: probabilities[i] for i, k in enumerate(elements)}
 
 
-def final_probability(last_times, errors, times):
+def ponderate_values(last_times, errors, times):
     '''
     :param last_times:
     :param errors:
     :param times:
     :return: ponderation
     '''
-    return (last_times * RATIO_LASTTIME) + (errors * RATIO_ERRORS) + (errors * RATIO_TIMES)
+    return (last_times * RATIO_LASTTIME) + (errors * RATIO_ERRORS) + (times * RATIO_TIMES)
 
 
 def obtain_probabilities(questions):
-    ids = [q.id for q in questions]
+    print questions
+    ids = [q.id for q in questions.query.all()]
     dnow = datetime.now()
 
-    last_times = {q.id: (dnow - q.last_time).total_seconds() for q in questions}
-    errors = {q.id: q.error_rate for q in questions}
-    times = {q.id: q.times for q in questions}
+    last_times = [(q.id, (dnow - q.last_time).total_seconds()) for q in questions]
+    errors = [(q.id, q.error_rate) for q in questions]
+    times = [(q.id, q.times) for q in questions]
 
-    plast_times = extract_probabilities(last_times, False)
-    perrors = extract_probabilities(errors, False)
-    ptimes = extract_probabilities(times, True)
+    plast_times = probability_by_position(last_times, True)
+    perrors = probability_by_position(errors, True)
+    ptimes = probability_by_position(times, False)
 
-    return [(key, final_probability(plast_times[key], perrors[key], ptimes[key])) for key in ids]
+    return [(key, ponderate_values(plast_times[key], perrors[key], ptimes[key])) for key in ids]
 
 
-def rulette_of_fortune(elems, nchoices):
+def wheel_of_fortune(elems, nchoices):
     selected = []
     while len(selected) < nchoices:
         val = random()
         current = 0
         for e in elems:
-            if current >= val:
+            current = current + e[1]
+            if val <= current:
                 if e[0] not in selected:
                     selected.append(e[0])
                 break
-            else:
-                current = current + e[1]
     return selected
 
 
-def extract_game(questions, nchoices=10):
+def extract_questions(questions, nchoices=10):
     probabilities = obtain_probabilities(questions)
-    sorted_probs = sorted(probabilities, key=get_key2sort)
-    return rulette_of_fortune(sorted_probs, nchoices)
+    #sorted_probs = sorted(probabilities, key=get_key2sort)
+    ids = wheel_of_fortune(probabilities, nchoices)
+    ids = [v[0] for v in ids]
+    return [q for q in questions if q.id in ids]

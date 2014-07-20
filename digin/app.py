@@ -4,6 +4,7 @@
 from flask import Flask
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.restless import APIManager
+from datetime import datetime
 import game_creator
 
 MODE_FRONT2REVER = 0
@@ -16,7 +17,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///digin.db'
 db = SQLAlchemy(app)
 
 
-game = db.Table(
+rel_game_question = db.Table(
     db.Column('game_id', db.Integer, db.ForeignKey('game.id')),
     db.Column('question_id', db.Integer, db.ForeignKey('question.id'))
 )
@@ -74,20 +75,31 @@ api_manager.create_api(Card, methods=['GET', 'POST', 'DELETE', 'PUT'])
 
 
 def mount_game(questions):
-    game_creator.extract_game(questions)
+    f_questions = game_creator.extract_questions(questions)
+    game = Game()
 
 
-@app.route("/new_game")
-def create_game(deck_id, mode):
+def prepare_questions(deck_id, mode):
     cards = Deck.query.get(deck_id).cards
     questions = []
     for card in cards:
-        question = card.questions.query(mode=mode)
+        question = card.questions #.query(mode=mode)
         if question is None:
             question = Question(card=card)
             db.session.add(question)
         questions.append(question)
     db.session.commit()
+    return questions
+
+
+def create_game(deck_id, mode):
+    questions = prepare_questions(deck_id, mode)
+    return mount_game(questions)
+
+
+@app.route("/new_game")
+def new_game(deck_id, mode):
+    game = create_game(deck_id, mode)
 
 
 @app.route("/")
